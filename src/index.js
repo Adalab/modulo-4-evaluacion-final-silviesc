@@ -3,6 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
 require('dotenv').config();
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 //crear el servidor
 const server = express();
@@ -24,156 +26,251 @@ async function getConnection() {
     return conex;
 }
 
-getConnection();
-
 server.listen(port, () => {
     console.log(`Servidor escuchando por http://localhost:${port}`);
 })
 
 //endpoint para obtener todas las artistas guardadas
 server.get('/artists', async(req, res) => {
-    const conex = await getConnection();
-    const artistsSQL = 'SELECT * FROM artists';
-    const [result] = await conex.query(artistsSQL);
-    const numberOfElements = result.length;
-    res.json({
-        info: {count: numberOfElements}, 
-        results: result
-    });
+    try {
+        const conex = await getConnection();
+        const artistsSQL = 'SELECT * FROM artists';
+        const [result] = await conex.query(artistsSQL);
+        const numberOfElements = result.length;
+        res.json({
+            info: { count: numberOfElements }, 
+            results: result
+        });
+        conex.end(); // Cerrar la conexión después de usarla
+    } catch (error) {
+        console.error('Error al obtener las artistas:', error);
+        res.status(500).json({ success: false, error: 'Error interno del servidor' });
+    }
 });
 
 //endpoint para obtener todos los festivales guardados
 server.get('/festivals', async(req, res) => {
-    const conex = await getConnection();
-    const festivalsSQL = 'SELECT * FROM festivals';
-    const [result] = await conex.query(festivalsSQL);
-    const numberOfElements = result.length;
-    res.json({
-        info: {count: numberOfElements}, 
-        results: result
-    });
+    try {
+        const conex = await getConnection();
+        const festivalsSQL = 'SELECT * FROM festivals';
+        const [result] = await conex.query(festivalsSQL);
+        const numberOfElements = result.length;
+        res.json({
+            info: { count: numberOfElements }, 
+            results: result
+        });
+        conex.end();
+    } catch (error) {
+        console.error('Error al obtener los festivales:', error);
+        res.status(500).json({ success: false, error: 'Error interno del servidor' });
+    }
+});
+
+//endpoint para obtener toda la info relacionada
+server.get('/all_info', async(req, res) => {
+    try {
+        const conex = await getConnection();
+        const all_info = 'SELECT artists.idArtist, artists.name, artists.genre, artists.hit, artists.grammys, festivals.name AS festival_name FROM artists JOIN festivals ON artists.fk_festival = festivals.idFestival';
+        const [result] = await conex.query(all_info);
+        // const numberOfElements = result.length;
+        res.json({
+            success: true, 
+            results: result
+        });
+        conex.end();
+    } catch (error) {
+        console.error('Error al obtener los festivales:', error);
+        res.status(500).json({ success: false, error: 'Error interno del servidor' });
+    }
 });
 
 //endpoint para obtener una artista por su ID
 server.get('/artists/:id', async(req, res) => {
-    const conex = await getConnection();
-    const idArtist = req.params.id;
-    if(isNaN(idArtist)) { 
-        return res.json({success: false, error: 'El ID de la artista debe ser un número'})
-    };
-    const getArtist = 'SELECT * FROM artists WHERE idArtist = ?';
-    const [result] = await conex.query(getArtist, [idArtist]);
-    if (result.length === 0) {
-        return res.json({success: false, error: 'El ID introducido no existe'})
-    }; 
-    res.json({success: true, artista: result[0]});
+    try {
+        const conex = await getConnection();
+        const idArtist = req.params.id;
+        if(isNaN(idArtist)) { 
+            return res.json({success: false, error: 'El ID de la artista debe ser un número'})
+        };
+        const getArtist = 'SELECT * FROM artists WHERE idArtist = ?';
+        const [result] = await conex.query(getArtist, [idArtist]);
+        if (result.length === 0) {
+            return res.json({success: false, error: 'El ID introducido no existe'})
+        }; 
+        res.json({success: true, artista: result[0]});
+        conex.end(); // Cerrar la conexión después de usarla
+    } catch (error) {
+        console.error('Error al obtener la artista:', error);
+        res.status(500).json({ success: false, error: 'Error interno del servidor' });
+    }
 });
 
 //endpoint para obtener un festival por su ID
 server.get('/festivals/:id', async(req, res) => {
-    const conex = await getConnection();
-    const idFestival = req.params.id;
-    if(isNaN(idFestival)) { 
-        return res.json({success: false, error: 'El ID del festival debe ser un número'})
-    };
-    const getFestival = 'SELECT * FROM festivals WHERE idFestival = ?';
-    const [result] = await conex.query(getFestival, [idFestival]);
-    if (result.length === 0) {
-        return res.json({success: false, error: 'El ID introducido no existe'})
-    }; 
-    res.json({success: true, festival: result[0]});
+    try {
+        const conex = await getConnection();
+        const idFestival = req.params.id;
+        if(isNaN(idFestival)) { 
+            return res.json({success: false, error: 'El ID del festival debe ser un número'})
+        };
+        const getFestival = 'SELECT * FROM festivals WHERE idFestival = ?';
+        const [result] = await conex.query(getFestival, [idFestival]);
+        if (result.length === 0) {
+            return res.json({success: false, error: 'El ID introducido no existe'})
+        }; 
+        res.json({success: true, festival: result[0]});
+        conex.end(); // Cerrar la conexión después de usarla
+    } catch (error) {
+        console.error('Error al obtener el festival:', error);
+        res.status(500).json({ success: false, error: 'Error interno del servidor' });
+    }
 });
 
 //endpoint para añadir una nueva artista
 server.post('/artists', async(req, res) => {
-    const conex = await getConnection();
-    const data = req.body;
-    const {nameArtist, musicalGenre, hit, grammys} = data;
-    const newArtist = 'INSERT INTO artists (name, genre, hit, grammys) VALUES (?, ?, ?, ?)';
-    const [result] = await conex.query(newArtist, [nameArtist, musicalGenre, hit, grammys]);
-    res.json({
-        success: true,
-        id: result.insertId
-    });
+    try {
+        const conex = await getConnection();
+        const data = req.body;
+        const {nameArtist, musicalGenre, hit, grammys} = data;
+        if (!nameArtist || !musicalGenre || !hit || !grammys) {
+            return res.status(400).json({ success: false, error: `Se requieren todos los campos: ${nameArtist}, ${musicalGenre}, ${hit} y ${grammys}` });
+        }
+        if (isNaN(grammys)) {
+            return res.status(400).json({ success: false, error: 'El campo grammys debe ser un número' });
+        }
+        const newArtist = 'INSERT INTO artists (name, genre, hit, grammys) VALUES (?, ?, ?, ?)';
+        const [result] = await conex.query(newArtist, [nameArtist, musicalGenre, hit, grammys]);
+        res.json({
+            success: true,
+            id: result.insertId
+        });
+    } catch (error) {
+        console.error('Error al añadir la artista:', error);
+        res.status(500).json({ success: false, error: 'Error interno del servidor' });
+    }
 });
 
-//endpoint para añadir un nuevo festival
+// endpoint para añadir un nuevo festival
 server.post('/festivals', async(req, res) => {
-    const conex = await getConnection();
-    const data = req.body;
-    const {nameFestival, location, date, ticketPrice} = data;
-    const newFestival = 'INSERT INTO festivals (name, location, date, price) VALUES (?, ?, ?, ?)';
-    const [result] = await conex.query(newFestival, [nameFestival, location, date, ticketPrice]);
-    res.json({
-        success: true,
-        id: result.insertId
-    });
+    try {
+        const conex = await getConnection();
+        const data = req.body;
+        const {nameFestival, location, date, ticketPrice} = data;
+        if (!nameFestival || !location || !date || !ticketPrice) {
+            return res.status(400).json({ success: false, error: `Se requieren todos los campos: ${nameFestival}, ${location}, ${date} y ${ticketPrice}` });
+        }
+        if (isNaN(ticketPrice)) {
+            return res.status(400).json({ success: false, error: `El campo ${ticketPrice} debe ser un número` });
+        }
+        const newFestival = 'INSERT INTO festivals (name, location, date, price) VALUES (?, ?, ?, ?)';
+        const [result] = await conex.query(newFestival, [nameFestival, location, date, ticketPrice]);
+        res.json({
+            success: true,
+            id: result.insertId
+        });
+    } catch (error) {
+        console.error('Error al añadir festival:', error);
+        res.status(500).json({ success: false, error: 'Error interno del servidor' });
+    }
 });
 
 //endpoint para actualizar una artista existente
 server.put('/artists/:id', async(req, res) => {
-    const conex = await getConnection();
-    const id = req.params.id;
-    const data = req.body;
-    const {nameArtist, musicalGenre, hit, grammys} = data;
-    const modifyArtist = 'UPDATE artists SET name = ?, genre = ?, hit = ?, grammys = ? WHERE idArtist = ?';
-    const [result] = await conex.query(modifyArtist, [nameArtist, musicalGenre, hit, grammys, id]);
-    res.json({
-        success: true,
-        message: 'La artista ha sido actualizada correctamente'
-    });
+    try {
+        const conex = await getConnection();
+        const id = req.params.id;
+        const data = req.body;
+        const {nameArtist, musicalGenre, hit, grammys} = data;
+        if (!nameArtist || !musicalGenre || !hit || !grammys) {
+            return res.status(400).json({ success: false, error: `Se requieren todos los campos: ${nameArtist}, ${musicalGenre}, ${hit} y ${grammys}` });
+        }
+        if (isNaN(grammys)) {
+            return res.status(400).json({ success: false, error: `El campo ${grammys} debe ser un número` });
+        }
+        const modifyArtist = 'UPDATE artists SET name = ?, genre = ?, hit = ?, grammys = ? WHERE idArtist = ?';
+        const [result] = await conex.query(modifyArtist, [nameArtist, musicalGenre, hit, grammys, id]);
+        res.json({
+            success: true,
+            message: 'La artista ha sido actualizada correctamente'
+        });
+    } catch (error) {
+        console.error('Error al actualizar artista:', error);
+        res.status(500).json({ success: false, error: 'Error interno del servidor' });
+    }
 });
 
 //endpoint para actualizar un festival existente
 server.put('/festivals/:id', async(req, res) => {
-    const conex = await getConnection();
-    const id = req.params.id;
-    const data = req.body;
-    const {nameFestival, location, date, ticketPrice} = data;
-    const modifyFestival = 'UPDATE festivals SET name = ?, location = ?, date = ?, price = ? WHERE idFestival = ?';
-    const [result] = await conex.query(modifyFestival, [nameFestival, location, date, ticketPrice, id]);
-    res.json({
-        success: true,
-        message: 'El festival ha sido actualizado correctamente'
-    });
+    try {
+        const conex = await getConnection();
+        const id = req.params.id;
+        const data = req.body;
+        const {nameFestival, location, date, ticketPrice} = data;
+        if (!nameFestival || !location || !date || !ticketPrice) {
+            return res.status(400).json({ success: false, error: `Se requieren todos los campos: ${nameFestival}, ${location}, ${date} y ${ticketPrice}` });
+        }
+        if (isNaN(ticketPrice)) {
+            return res.status(400).json({ success: false, error: `El campo ${ticketPrice} debe ser un número` });
+        }
+        const modifyFestival = 'UPDATE festivals SET name = ?, location = ?, date = ?, price = ? WHERE idFestival = ?';
+        const [result] = await conex.query(modifyFestival, [nameFestival, location, date, ticketPrice, id]);
+        res.json({
+            success: true,
+            message: 'El festival ha sido actualizado correctamente'
+        });
+    } catch (error) {
+        console.error('Error al actualizar festival:', error);
+        res.status(500).json({ success: false, error: 'Error interno del servidor' });
+    }
 });
 
 //endpoint para eliminar una artista de la BD
 server.delete('/artists/:id', async (req, res) => {
-    const conex = await getConnection();
-    const id = req.params.id;
-    const deleteArtist = 'DELETE FROM artists WHERE idArtist = ?';
-    const [result] = await conex.query(deleteArtist, [id]);
-    if(result.affectedRows > 0) {
-        res.json({
-            success: true,
-            message: 'La artista ha sido eliminada correctamente'
-        });
-    } else {
-        res.json({
-            success: false,
-            message: 'No se ha podido eliminar la artista seleccionada'
-        });
-    };
+    try {
+        const conex = await getConnection();
+        const id = req.params.id;
+        const deleteArtist = 'DELETE FROM artists WHERE idArtist = ?';
+        const [result] = await conex.query(deleteArtist, [id]);
+        if (result.affectedRows > 0) {
+            res.json({
+                success: true,
+                message: 'La artista ha sido eliminada correctamente'
+            });
+        } else {
+            res.status(404).json({
+                success: false,
+                message: 'No se ha encontrado ninguna artista con el ID proporcionado'
+            });
+        }
+    } catch (error) {
+        console.error('Error al eliminar artista:', error);
+        res.status(500).json({ success: false, error: 'Error interno del servidor' });
+    }
 });
 
 //endpoint para eliminar un festival de la BD
 server.delete('/festivals/:id', async (req, res) => {
-    const conex = await getConnection();
-    const id = req.params.id;
-    const deleteFestival = 'DELETE FROM festivals WHERE idFestival = ?';
-    const [result] = await conex.query(deleteFestival, [id]);
-    if(result.affectedRows > 0) {
-        res.json({
-            success: true,
-            message: 'El festival ha sido eliminado correctamente'
-        });
-    } else {
-        res.json({
-            success: false,
-            message: 'No se ha podido eliminar el festival seleccionado'
-        });
-    };
+    try {
+        const conex = await getConnection();
+        const id = req.params.id;
+        const deleteFestival = 'DELETE FROM festivals WHERE idFestival = ?';
+        const [result] = await conex.query(deleteFestival, [id]);
+        if (result.affectedRows > 0) {
+            res.json({
+                success: true,
+                message: 'El festival ha sido eliminado correctamente'
+            });
+        } else {
+            res.status(404).json({
+                success: false,
+                message: 'No se ha encontrado ningún festival con el ID proporcionado'
+            });
+        }
+    } catch (error) {
+        console.error('Error al eliminar festival:', error);
+        res.status(500).json({ success: false, error: 'Error interno del servidor' });
+    }
 });
 
-
+//BONUS
+//endpoint de registro de usuario

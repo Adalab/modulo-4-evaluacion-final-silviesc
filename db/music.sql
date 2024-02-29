@@ -37,3 +37,8 @@ ALTER TABLE artists
 ADD CONSTRAINT fk_festival
 FOREIGN KEY (fk_festival)
 REFERENCES festivals(idFestival);
+
+-- Obtener toda la información de artistas y festivales relacionada
+SELECT artists.idArtist, artists.name, artists.genre, artists.hit, artists.grammys, festivals.name AS festival_name
+FROM artists
+JOIN festivals ON artists.fk_festival = festivals.idFestival;
