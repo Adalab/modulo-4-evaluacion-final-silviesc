@@ -42,3 +42,18 @@ REFERENCES festivals(idFestival);
 SELECT artists.idArtist, artists.name, artists.genre, artists.hit, artists.grammys, festivals.name AS festival_name
 FROM artists
 JOIN festivals ON artists.fk_festival = festivals.idFestival;
+
+--- BONUS
+
+CREATE TABLE usuarios_db (
+	id INT auto_increment primary key,
+    email VARCHAR(45) unique,
+    `name` VARCHAR(45),
+    address VARCHAR(60),
+    password VARCHAR(30)
+);
+
+INSERT INTO usuarios_db (email, name, address, password) 
+VALUES ('roberta@gmail.com', 'Roberta', 'Calle Pobla de Segur', 'roberta.123');
+
+ALTER TABLE usuarios_db MODIFY COLUMN password VARCHAR(100);
