@@ -1,6 +1,7 @@
 # Proyecto: Evaluación final módulo 4 - Express JS y BBDD
-Este proyecto consiste en una API que proporciona acceso a información sobre distintos artistas y festivales. 
+Este proyecto consiste en una API que proporciona acceso a información sobre distintos artistas y festivales.
 Utiliza el formato JSON para las solicitudes y respuestas, y requiere autenticación para algunas operaciones.
+Toda esta información está almacenada en una base de datos llamada "music".
 
 # Endpoints disponibles
 1. GET /artists: Obtiene información sobre todas las artistas.
@@ -51,7 +52,7 @@ En la parte inferior de la pantalla, nos aparecerá la siguiente respuesta:
             "name": "Charlotte de Witte",
             "genre": "Techno",
             "hit": "Overdrive",
-            "grammys": 2,
+            "grammys": 1,
             "festival_name": "Aquasella"
         },
         {

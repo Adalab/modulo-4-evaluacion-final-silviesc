@@ -77,7 +77,6 @@ server.get("/all_info", async (req, res) => {
     const all_info =
       "SELECT artists.idArtist, artists.name, artists.genre, artists.hit, artists.grammys, festivals.name AS festival_name FROM artists JOIN festivals ON artists.fk_festival = festivals.idFestival";
     const [result] = await conex.query(all_info);
-    // const numberOfElements = result.length;
     res.json({
       success: true,
       results: result,
@@ -145,43 +144,50 @@ server.get("/festivals/:id", async (req, res) => {
 
 //endpoint para añadir una nueva artista
 server.post("/artists", async (req, res) => {
-  try {
-    const conex = await getConnection();
-    const data = req.body;
-    const { nameArtist, musicalGenre, hit, grammys } = data;
-    if (!nameArtist || !musicalGenre || !hit || !grammys) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error: `Se requieren todos los campos: ${nameArtist}, ${musicalGenre}, ${hit} y ${grammys}`,
-        });
+    try {
+      const conex = await getConnection();
+      const data = req.body;
+      const { nameArtist, musicalGenre, hit, grammys, festivalName } = data;
+      if (!nameArtist || !musicalGenre || !hit || !grammys || !festivalName) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            error: 'Se requieren todos los campos: nameArtist, musicalGenre, hit, grammys y festivalName',
+          });
+      }
+      if (isNaN(grammys)) {
+        return res
+          .status(400)
+          .json({ success: false, error: "El campo grammys debe ser un número" });
+      }
+      // Consulta para obtener el ID del festival
+      const festivalQuery = 'SELECT idFestival FROM festivals WHERE name = ?';
+      const [festivalResult] = await conex.query(festivalQuery, [festivalName]);
+      if (festivalResult.length === 0) {
+        return res.status(400).json({ success: false, error: 'El festival especificado no existe' });
+      }
+      const festivalId = festivalResult[0].idFestival;
+      const newArtist = 'INSERT INTO artists (name, genre, hit, grammys, fk_festival) VALUES (?, ?, ?, ?, ?)';
+      const [result] = await conex.query(newArtist, [
+        nameArtist,
+        musicalGenre,
+        hit,
+        grammys,
+        festivalId,
+      ]);
+      res.json({
+        success: true,
+        id: result.insertId,
+      });
+      conex.end();
+    } catch (error) {
+      console.error('Error al añadir la artista:', error);
+      res
+        .status(500)
+        .json({ success: false, error: 'Error interno del servidor' });
     }
-    if (isNaN(grammys)) {
-      return res
-        .status(400)
-        .json({ success: false, error: "El campo grammys debe ser un número" });
-    }
-    const newArtist =
-      "INSERT INTO artists (name, genre, hit, grammys) VALUES (?, ?, ?, ?)";
-    const [result] = await conex.query(newArtist, [
-      nameArtist,
-      musicalGenre,
-      hit,
-      grammys,
-    ]);
-    res.json({
-      success: true,
-      id: result.insertId,
-    });
-    conex.end();
-  } catch (error) {
-    console.error("Error al añadir la artista:", error);
-    res
-      .status(500)
-      .json({ success: false, error: "Error interno del servidor" });
-  }
-});
+  });
 
 // endpoint para añadir un nuevo festival
 server.post("/festivals", async (req, res) => {
@@ -194,7 +200,7 @@ server.post("/festivals", async (req, res) => {
         .status(400)
         .json({
           success: false,
-          error: `Se requieren todos los campos: ${nameFestival}, ${location}, ${date} y ${ticketPrice}`,
+          error: 'Se requieren todos los campos: nameFestival, location, date y ticketPrice',
         });
     }
     if (isNaN(ticketPrice)) {
@@ -202,7 +208,7 @@ server.post("/festivals", async (req, res) => {
         .status(400)
         .json({
           success: false,
-          error: `El campo ${ticketPrice} debe ser un número`,
+          error: 'El campo ticketPrice debe ser un número',
         });
     }
     const newFestival =
@@ -228,48 +234,58 @@ server.post("/festivals", async (req, res) => {
 
 //endpoint para actualizar una artista existente
 server.put("/artists/:id", async (req, res) => {
-  try {
-    const conex = await getConnection();
-    const id = req.params.id;
-    const data = req.body;
-    const { nameArtist, musicalGenre, hit, grammys } = data;
-    if (!nameArtist || !musicalGenre || !hit || !grammys) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error: `Se requieren todos los campos: ${nameArtist}, ${musicalGenre}, ${hit} y ${grammys}`,
-        });
+    try {
+      const conex = await getConnection();
+      const id = req.params.id;
+      const data = req.body;
+      const { nameArtist, musicalGenre, hit, grammys, festivalName } = data;
+      if (!nameArtist || !musicalGenre || !hit || !grammys || !festivalName) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            error: 'Se requieren todos los campos: nameArtist, musicalGenre, hit, grammys y festivalName',
+          });
+      }
+      if (isNaN(grammys)) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            error: `El campo ${grammys} debe ser un número`,
+          });
+      }
+  
+      // Consulta para obtener el ID del festival
+      const festivalQuery = "SELECT idFestival FROM festivals WHERE name = ?";
+      const [festivalResult] = await conex.query(festivalQuery, [festivalName]);
+      if (festivalResult.length === 0) {
+        return res.status(400).json({ success: false, error: "El festival especificado no existe" });
+      }
+      const festivalId = festivalResult[0].idFestival;
+  
+      const modifyArtist =
+        "UPDATE artists SET name = ?, genre = ?, hit = ?, grammys = ?, fk_festival = ? WHERE idArtist = ?";
+      const [result] = await conex.query(modifyArtist, [
+        nameArtist,
+        musicalGenre,
+        hit,
+        grammys,
+        festivalId,
+        id,
+      ]);
+      res.json({
+        success: true,
+        message: "La artista ha sido actualizada correctamente",
+      });
+      conex.end();
+    } catch (error) {
+      console.error("Error al actualizar artista:", error);
+      res
+        .status(500)
+        .json({ success: false, error: "Error interno del servidor" });
     }
-    if (isNaN(grammys)) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error: `El campo ${grammys} debe ser un número`,
-        });
-    }
-    const modifyArtist =
-      "UPDATE artists SET name = ?, genre = ?, hit = ?, grammys = ? WHERE idArtist = ?";
-    const [result] = await conex.query(modifyArtist, [
-      nameArtist,
-      musicalGenre,
-      hit,
-      grammys,
-      id,
-    ]);
-    res.json({
-      success: true,
-      message: "La artista ha sido actualizada correctamente",
-    });
-    conex.end();
-  } catch (error) {
-    console.error("Error al actualizar artista:", error);
-    res
-      .status(500)
-      .json({ success: false, error: "Error interno del servidor" });
-  }
-});
+  });
 
 //endpoint para actualizar un festival existente
 server.put("/festivals/:id", async (req, res) => {
@@ -283,7 +299,7 @@ server.put("/festivals/:id", async (req, res) => {
         .status(400)
         .json({
           success: false,
-          error: `Se requieren todos los campos: ${nameFestival}, ${location}, ${date} y ${ticketPrice}`,
+          error: 'Se requieren todos los campos: nameFestival, location, date y ticketPrice',
         });
     }
     if (isNaN(ticketPrice)) {
@@ -291,7 +307,7 @@ server.put("/festivals/:id", async (req, res) => {
         .status(400)
         .json({
           success: false,
-          error: `El campo ${ticketPrice} debe ser un número`,
+          error: 'El campo ticketPrice debe ser un número',
         });
     }
     const modifyFestival =
